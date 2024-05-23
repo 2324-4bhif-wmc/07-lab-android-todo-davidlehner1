@@ -25,6 +25,7 @@ import at.htl.todo.model.Model
 import at.htl.todo.model.ModelStore
 import at.htl.todo.model.Todo
 import at.htl.todo.ui.theme.TodoTheme
+import at.htl.todo.util.store.Store
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -47,27 +48,27 @@ class MainView @Inject constructor() {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                Todos(model = viewModel, modifier = Modifier.padding(all = 32.dp))
+                Todos(model = viewModel, modifier = Modifier.padding(all = 32.dp), store = store)
             }
         }
     }
 }
 
 @Composable
-fun Todos(model: Model, modifier: Modifier = Modifier) {
+fun Todos(model: Model, modifier: Modifier = Modifier, store: ModelStore) {
     val todos = model.todos
     LazyColumn(
         modifier = modifier.padding(16.dp)
     ) {
         items(todos.size) { index ->
-            TodoRow(todo  = todos[index])
+            TodoRow(todo  = todos[index], index = index, store = store)
             HorizontalDivider()
         }
     }
 }
 
 @Composable
-fun TodoRow(todo: Todo) {
+fun TodoRow(todo: Todo, index: Int, store: ModelStore) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -86,22 +87,10 @@ fun TodoRow(todo: Todo) {
         Spacer(modifier = Modifier.weight(1f))
         Checkbox(
             checked = todo.completed,
-            onCheckedChange = { /* Update the completed status of the todo item */ }
+            onCheckedChange = {isChecked ->
+                store.updateTodoCompleted(index, isChecked)
+            }
         )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun TodoPreview() {
-    val model = Model()
-    val todo = Todo()
-    todo.id = 1
-    todo.title = "First Todo"
-    model.todos = arrayOf(todo)
-
-    TodoTheme {
-        Todos(model)
     }
 }
 
