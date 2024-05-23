@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.BlendMode.Companion.Screen
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -102,7 +103,7 @@ fun TodoRow(todo: Todo, index: Int, store: ModelStore) {
     ) {
         Text(
             text = todo.title,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall.copy(textDecoration = if (todo.completed) TextDecoration.LineThrough else TextDecoration.None),
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(3f)
         )
