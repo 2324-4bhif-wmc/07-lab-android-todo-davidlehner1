@@ -892,3 +892,25 @@ fun TabScreen(model: Model, store: ModelStore?, toDoService: TodoService?, activ
 2. Verweist auf die Details Seite via TodosDetail
 
 ====
+
+== Designprinzipien:
+
+=== Konsistentes Design
+* Geachtet darauf, dass sich die Tabs dort befinden, wo sie erwartet werden
+** Am oberen Ende
+
+.Prinzip
+image::images/design.png[]
+
+.Implementierung
+image::images/newTodoApp.png[]
+
+---
+
+=== Feedback und Klarheit
+* Wenn ein Todo erledigt ist, wird es in der Checkbox rechts angezeigt
+* In der Details seite ist ein Mistkübel zum löschen sichtbar, welcher durch die Wahl des Icons selbsterklärend ist.
+* Eine Anzeige oben rechts bietet eine schnelle Übersicht, wieviele Todos vorhanden sind.
+
+.Implementierung
+image::images/newTodoApp2.png[]
