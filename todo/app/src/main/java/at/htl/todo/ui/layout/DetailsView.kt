@@ -57,10 +57,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MainView @Inject constructor(store: ModelStore) {
-    val store = store
+class DetailsView @Inject constructor() {
 
-    /*@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+    /*@Inject
+    lateinit var store: ModelStore
+
+    @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
     fun buildContent(activity: ComponentActivity) {
         activity.enableEdgeToEdge()
@@ -71,29 +73,34 @@ class MainView @Inject constructor(store: ModelStore) {
                 .subscribeAsState(initial = Model())
                 .value
             Surface(
-                modifier = Modifier.fillMaxSize().padding(top = 56.dp),
+                modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                Todos(model = viewModel, modifier = Modifier.padding(top = 56.dp), store = store)
+                TodosDetail(
+                    model = viewModel,
+                    modifier = Modifier.padding(top = 56.dp),
+                    store = store
+                )
             }
         }
     }*/
 }
 
 @Composable
-fun Todos(model: Model, modifier: Modifier = Modifier, store: ModelStore) {
+fun TodosDetail(model: Model, modifier: Modifier = Modifier, store: ModelStore) {
     val todos = model.todos
     LazyColumn(
+        modifier = modifier.padding(16.dp)
     ) {
         items(todos.size) { index ->
-            TodoRow(todo = todos[index], index = index, store = store)
+            TodoDetailRow(todo = todos[index], index = index, store = store)
             HorizontalDivider()
         }
     }
 }
 
 @Composable
-fun TodoRow(todo: Todo, index: Int, store: ModelStore) {
+fun TodoDetailRow(todo: Todo, index: Int, store: ModelStore) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -101,19 +108,30 @@ fun TodoRow(todo: Todo, index: Int, store: ModelStore) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
+            text = todo.id.toString(),
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
             text = todo.title,
             style = MaterialTheme.typography.bodySmall,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(3f)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Spacer(modifier = Modifier.weight(1f))
-        Checkbox(
-            checked = todo.completed,
-            onCheckedChange = { isChecked ->
-                store.updateTodoCompleted(index, isChecked)
-            }
+        Text(
+            text = "User: " + todo.userId.toString(),
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
         )
+        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.weight(1f))
+        IconButton(onClick = {
+            store.delete(index)
+        }) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete")
+        }
     }
 }
 
