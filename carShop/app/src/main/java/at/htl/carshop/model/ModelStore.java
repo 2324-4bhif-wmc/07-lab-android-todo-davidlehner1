@@ -4,6 +4,8 @@ import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
+
 import javax.inject.Inject;
 
 import at.htl.carshop.util.store.Store;
@@ -23,15 +25,15 @@ public class ModelStore extends Store<Model> {
         apply(model -> model.uiState.selectedTab = tabIndex);
     }
 
-    // Remove car By Id
+    // Remove car By Id, and also remove associated repairs
     public void deleteCarById(Long id){
         apply(model -> {
             Car[] carsAll = model.cars;
             Car[] cars = new Car[carsAll.length - 1];
             int j = 0;
-            for (int i = 0; i < carsAll.length; i++) {
-                if (carsAll[i].id != id) {
-                    cars[j] = carsAll[i];
+            for (Car car : carsAll) {
+                if (!Objects.equals(car.id, id)) {
+                    cars[j] = car;
                     j++;
                 }
             }
@@ -45,9 +47,9 @@ public class ModelStore extends Store<Model> {
             Repair[] repairsAll = model.repairs;
             Repair[] repairs = new Repair[repairsAll.length - 1];
             int j = 0;
-            for (int i = 0; i < repairsAll.length; i++) {
-                if (repairsAll[i].id != id) {
-                    repairs[j] = repairsAll[i];
+            for (Repair repair : repairsAll) {
+                if (!Objects.equals(repair.id, id)) {
+                    repairs[j] = repair;
                     j++;
                 }
             }
@@ -65,6 +67,18 @@ public class ModelStore extends Store<Model> {
             cars[carsAll.length] = car;
             model.cars = cars;
             Log.i("ModelStore", "Created car: " + car);
+        });
+    }
+
+    public void createRepair(@NotNull Repair repair) {
+        apply(model -> {
+            Repair[] repairsAll = model.repairs;
+            Repair[] repairs = new Repair[repairsAll.length + 1];
+            repair.id = (long) repairs.length;
+            System.arraycopy(repairsAll, 0, repairs, 0, repairsAll.length);
+            repairs[repairsAll.length] = repair;
+            model.repairs = repairs;
+            Log.i("ModelStore", "Created repair: " + repair);
         });
     }
 }

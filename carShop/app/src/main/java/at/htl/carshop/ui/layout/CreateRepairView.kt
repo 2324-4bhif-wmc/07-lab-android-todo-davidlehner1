@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -25,61 +28,61 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class CreateRepairView @Inject constructor(){
+class CreateRepairView @Inject constructor() {
 }
 
 @Composable
-fun CreateRepair(model: Model, store: ModelStore){
+fun CreateRepair(model: Model, store: ModelStore) {
     var price by remember { mutableStateOf("") }
-    var car by remember { mutableStateOf("") }
+    var car by remember { mutableStateOf(Car()) }
     var description by remember { mutableStateOf("") }
+    var showDropdown by remember { mutableStateOf(false) }
 
-/*    Row {
+    Row {
+        Button(onClick = { showDropdown = true }) {
+            Text("Select Car")
+        }
+        DropdownMenu(
+            expanded = showDropdown,
+            onDismissRequest = { showDropdown = false }
+        ) {
+            if (model.cars.isNotEmpty()) {
+                model.cars.forEach { dropdownCar ->
+                    DropdownMenuItem(onClick = {
+                        car = dropdownCar
+                        showDropdown = false
+                    }, text = {
+                        Text(text = dropdownCar.brand + " " + dropdownCar.model)
+                    })
+                }
+            }
+        }
+    }
+    Row {
+        Text(text = "Selected Car: " + car.brand + " " + car.model)
+    }
+    Row {
         TextField(
             value = description,
             onValueChange = { description = it },
-            label = { Text("Brand") }
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-    }
-    Row {
-        TextField(
-            value = model,
-            onValueChange = { model = it },
-            label = { Text("Model") }
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-    }
-    Row {
-        TextField(
-            value = year,
-            onValueChange = { year = it },
-            label = { Text("Year") }
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-    }
-    Row {
-        TextField(
-            value = color,
-            onValueChange = { color = it },
-            label = { Text("Color") }
+            label = { Text("Description") }
         )
         Spacer(modifier = Modifier.height(20.dp))
     }
     Row {
         TextField(
             value = price,
-            onValueChange = { price = it},
+            onValueChange = { price = it },
             label = { Text("Price") }
         )
         Spacer(modifier = Modifier.height(20.dp))
     }
     Row {
         IconButton(onClick = {
-            val car = Car(1, brand, model, year.toInt(), color, price.toInt())
-            store.createCar(car)
+            val repair = Repair(car, 1, description, price.toInt())
+            store.createRepair(repair)
         }) {
             Icon(Icons.Filled.Add, "Create Car")
         }
-    }*/
+    }
 }
