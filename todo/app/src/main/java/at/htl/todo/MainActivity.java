@@ -17,9 +17,6 @@ import dagger.hilt.android.AndroidEntryPoint;
 @AndroidEntryPoint
 public class MainActivity extends ComponentActivity {
     @Inject
-    MainView mainView;
-
-    @Inject
     MainViewBuilder mainViewBuilder;
     @Inject
     TodoService todoService;

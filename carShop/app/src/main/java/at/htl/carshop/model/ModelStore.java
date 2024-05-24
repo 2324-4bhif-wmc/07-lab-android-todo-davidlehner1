@@ -4,23 +4,41 @@ import android.util.Log;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import at.htl.carshop.util.store.Store;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 
+@Singleton
 public class ModelStore extends Store<Model> {
     @Inject
     ModelStore() {
         super(Model.class, new Model());
     }
 
+    @Inject
+    CarService carService;
+
+    @Inject
+    RepairService repairService;
+
     public void setCars(Car[] cars) {
-        apply(model -> model.cars = cars);
+        apply(model -> {
+            model.cars = cars;
+        });
     }
+
+    public void setRepairs(Repair[] repairs) {
+        apply(model -> {
+            model.repairs = repairs;
+        });
+    }
+
     public void selectTab(int tabIndex) {
         apply(model -> model.uiState.selectedTab = tabIndex);
     }
@@ -39,6 +57,7 @@ public class ModelStore extends Store<Model> {
             }
             model.cars = cars;
         });
+        carService.delete(id);
     }
 
     // Remove Repair By Id
@@ -55,6 +74,7 @@ public class ModelStore extends Store<Model> {
             }
             model.repairs = repairs;
         });
+        repairService.delete(id);
     }
 
     @NotNull
@@ -62,23 +82,27 @@ public class ModelStore extends Store<Model> {
         apply(model -> {
             Car[] carsAll = model.cars;
             Car[] cars = new Car[carsAll.length + 1];
-            car.id = (long) cars.length;
+            long maxId = Arrays.stream(carsAll).mapToLong(c -> c.id).max().orElse(0);
+            car.id = maxId + 1;
             System.arraycopy(carsAll, 0, cars, 0, carsAll.length);
             cars[carsAll.length] = car;
             model.cars = cars;
             Log.i("ModelStore", "Created car: " + car);
         });
+        carService.save(car);
     }
 
     public void createRepair(@NotNull Repair repair) {
         apply(model -> {
             Repair[] repairsAll = model.repairs;
             Repair[] repairs = new Repair[repairsAll.length + 1];
-            repair.id = (long) repairs.length;
+            long maxId = Arrays.stream(repairsAll).mapToLong(r -> r.id).max().orElse(0);
+            repair.id = maxId + 1;
             System.arraycopy(repairsAll, 0, repairs, 0, repairsAll.length);
             repairs[repairsAll.length] = repair;
             model.repairs = repairs;
             Log.i("ModelStore", "Created repair: " + repair);
         });
+        repairService.save(repair);
     }
 }
