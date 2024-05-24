@@ -916,4 +916,1140 @@ image::images/newTodoApp.png[]
 .Implementierung
 image::images/newTodoApp2.png[]
 
-== Übung 3:
+== Übung 3: neues Projekt (Unterverzeichnis carShop)
+
+=== Start:
+* postgres-run-in-docker.sh ausführen
+* carShopBackend starten
+* carShop Android App starten
+
+=== Implementierung:
+
+* Gleichbleibend zum Tutorial:
+** Util-Klassen
+*** Immer
+*** Mapper
+*** Resteasy
+*** Store
+*** Config
+* Veränderungen in:
+** Model-Klassen
+*** inkl. Services und Clients
+** DTOS hinzugefügt
+** View
+** MainActivity
+
+=== Model:
+
+.Car
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+public class Car {
+    public Long id;
+    public String brand;
+    public String model;
+    public int year;
+    public String color;
+    public int price;
+
+    public Car() {
+    }
+
+    public Car(Long id, String brand, String model, int year, String color, int price) {
+        this.id = id;
+        this.brand = brand;
+        this.model = model;
+        this.year = year;
+        this.color = color;
+        this.price = price;
+    }
+}
+----
+* Car Klasse, welche ein Einfaches Auto repräsentiert
+====
+
+.Repair
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+public class Repair {
+    public Long carId; //<1>
+    public Long id;
+    public String description;
+    public int price;
+
+    public Repair() {
+    }
+
+    public Repair(Long carId, Long id, String description, int price) {
+        this.carId = carId;
+        this.id = id;
+        this.description = description;
+        this.price = price;
+    }
+}
+----
+* Repair Klasse, welche eine Reparatur repräsentiert
+1. Verknüpft mit eine zugehörigen Auto
+====
+
+.Model
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+public class Model {
+    public static class UIState {
+        public int selectedTab = 0;
+    }
+
+    public Car[] cars = new Car[0];
+
+    public Repair[] repairs = new Repair[0];
+    public UIState uiState = new UIState();
+
+}
+
+----
+* Speichert den Zustand der gesamten App
+** Autos
+** Reparaturen
+** UIState (Tabs)
+====
+
+.ModelStore
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+import android.util.Log;
+
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Arrays;
+import java.util.Objects;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import at.htl.carshop.util.store.Store;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function0;
+
+@Singleton
+public class ModelStore extends Store<Model> {
+    @Inject
+    ModelStore() {
+        super(Model.class, new Model());
+    }
+
+    @Inject
+    CarService carService;
+
+    @Inject
+    RepairService repairService;
+
+    public void setCars(Car[] cars) {
+        apply(model -> {
+            model.cars = cars;
+        });
+    }
+
+    public void setRepairs(Repair[] repairs) {
+        apply(model -> {
+            model.repairs = repairs;
+        });
+    }
+
+    public void selectTab(int tabIndex) {
+        apply(model -> model.uiState.selectedTab = tabIndex);
+    }
+
+    // Remove car By Id, and also remove associated repairs
+    public void deleteCarById(Long id){
+        apply(model -> {
+            Car[] carsAll = model.cars;
+            Car[] cars = new Car[carsAll.length - 1];
+            int j = 0;
+            for (Car car : carsAll) {
+                if (!Objects.equals(car.id, id)) {
+                    cars[j] = car;
+                    j++;
+                }
+            }
+            model.cars = cars;
+        });
+        carService.delete(id);
+    }
+
+    // Remove Repair By Id
+    public void deleteRepairById(Long id){
+        apply(model -> {
+            Repair[] repairsAll = model.repairs;
+            Repair[] repairs = new Repair[repairsAll.length - 1];
+            int j = 0;
+            for (Repair repair : repairsAll) {
+                if (!Objects.equals(repair.id, id)) {
+                    repairs[j] = repair;
+                    j++;
+                }
+            }
+            model.repairs = repairs;
+        });
+        repairService.delete(id);
+    }
+
+    @NotNull
+    public void createCar(@NotNull Car car) {
+        apply(model -> {
+            Car[] carsAll = model.cars;
+            Car[] cars = new Car[carsAll.length + 1];
+            long maxId = Arrays.stream(carsAll).mapToLong(c -> c.id).max().orElse(0);
+            car.id = maxId + 1;
+            System.arraycopy(carsAll, 0, cars, 0, carsAll.length);
+            cars[carsAll.length] = car;
+            model.cars = cars;
+            Log.i("ModelStore", "Created car: " + car);
+        });
+        carService.save(car);
+    }
+
+    public void createRepair(@NotNull Repair repair) {
+        apply(model -> {
+            Repair[] repairsAll = model.repairs;
+            Repair[] repairs = new Repair[repairsAll.length + 1];
+            long maxId = Arrays.stream(repairsAll).mapToLong(r -> r.id).max().orElse(0);
+            repair.id = maxId + 1;
+            System.arraycopy(repairsAll, 0, repairs, 0, repairsAll.length);
+            repairs[repairsAll.length] = repair;
+            model.repairs = repairs;
+            Log.i("ModelStore", "Created repair: " + repair);
+        });
+        repairService.save(repair);
+    }
+}
+----
+* Methoden zum Erstellen, Löschen und Setzen von Autos und Reparaturen
+* Verknüpfung mit den Services
+====
+
+=== Services und Clients:
+
+.CarClient
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+import at.htl.carshop.DTO.CarDTO;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/car")
+@Consumes(MediaType.APPLICATION_JSON)
+public interface CarClient {
+    @GET
+    Car[] all();
+
+    @DELETE
+    @Path("/{id}")
+    void delete(@PathParam("id") Long id);
+    @POST
+    void add(CarDTO car);
+}
+----
+* Endpoints für Autos
+* GET, DELETE, POST
+====
+
+.RepairClient
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import at.htl.carshop.DTO.RepairDTO;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/repair")
+@Consumes(MediaType.APPLICATION_JSON)
+public interface RepairClient {
+    @GET
+    Repair[] all();
+
+    @DELETE
+    @Path("/{id}")
+    void delete(@PathParam("id") Long id);
+
+    @POST
+    void add(RepairDTO repair);
+}
+----
+* Endpoints für Reparaturen
+* GET, DELETE, POST
+====
+
+.CarService
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+import android.util.Log;
+
+import java.util.concurrent.CompletableFuture;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import at.htl.carshop.DTO.CarDTO;
+import at.htl.carshop.util.resteasy.RestApiClientBuilder;
+
+@Singleton
+public class CarService {
+    static final String TAG = CarService.class.getSimpleName();
+    public static String JSON_PLACEHOLDER_BASE_URL = "http://10.0.2.2:8080";
+    public final CarClient carClient;
+
+    @Inject
+    CarService(RestApiClientBuilder builder) {
+        Log.i(TAG, "Creating CarService with base url: " + JSON_PLACEHOLDER_BASE_URL);
+        carClient = builder.build(CarClient.class, JSON_PLACEHOLDER_BASE_URL);
+    }
+
+
+    public CompletableFuture<Car[]> getAll() {
+        return CompletableFuture
+                .supplyAsync(() -> {
+                    Car[] cars = carClient.all();
+                    Log.i(TAG, "Car: Total cars loaded: " + cars.length);
+                    for (Car car : cars) {
+                        Log.i(TAG, "Car: Brand: " + car.brand);
+                        Log.i(TAG, "Car: Model: " + car.model);
+                    }
+                    return cars;
+                })
+                .exceptionally((e) -> {
+                    Log.e(TAG, "Error loading cars", e);
+                    return null;
+                });
+    }
+
+    public void delete(Long id) {
+        CompletableFuture.runAsync(() -> {
+            carClient.delete(id);
+            Log.i(TAG, "Car: Deleted car with id: " + id);
+        }).exceptionally((e) -> {
+            Log.e(TAG, "Error deleting car with id: " + id, e);
+            return null;
+        });
+    }
+
+    public void save(Car car) {
+        CompletableFuture.runAsync(() -> {
+            CarDTO carDTO = new CarDTO(car.brand, car.model, car.year, car.color, car.price);
+            carClient.add(carDTO);
+            Log.i(TAG, "Car: Saved car with id: " + car.id);
+        }).exceptionally((e) -> {
+            Log.e(TAG, "Error saving car with id: " + car.id, e);
+            return null;
+        });
+    }
+}
+----
+* Methoden zum Laden, Löschen und Speichern von Autos
+* Verwendung von CompletableFuture für asynchrone Operationen
+====
+
+.RepairService
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.model;
+
+import android.util.Log;
+
+import java.util.concurrent.CompletableFuture;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import at.htl.carshop.DTO.RepairDTO;
+import at.htl.carshop.util.resteasy.RestApiClientBuilder;
+
+@Singleton
+public class RepairService {
+    static final String TAG = CarService.class.getSimpleName();
+    public static String JSON_PLACEHOLDER_BASE_URL = "http://10.0.2.2:8080";
+    public final RepairClient repairClient;
+
+    @Inject
+    RepairService(RestApiClientBuilder builder) {
+        Log.i(TAG, "Creating CarService with base url: " + JSON_PLACEHOLDER_BASE_URL);
+        repairClient = builder.build(RepairClient.class, JSON_PLACEHOLDER_BASE_URL);
+    }
+
+
+    public CompletableFuture<Repair[]> getAll() {
+        return CompletableFuture
+                .supplyAsync(() -> {
+                    Repair[] repairs = repairClient.all();
+                    Log.i(TAG, "Repair: Total repairs loaded: " + repairs.length);
+                    for (Repair repair : repairs) {
+                        Log.i(TAG, "Repair: Description: " + repair.description);
+                        Log.i(TAG, "Repair: Price: " + repair.price);
+                        Log.i(TAG, "Repair: Car ID: " + repair.carId);
+                    }
+                    return repairs;
+                })
+                .exceptionally((e) -> {
+                    Log.e(TAG, "Error loading repairs", e);
+                    return null;
+                });
+    }
+
+    public void delete(Long id) {
+        CompletableFuture.runAsync(() -> {
+            repairClient.delete(id);
+            Log.i(TAG, "Repair: Deleted repair with id: " + id);
+        }).exceptionally((e) -> {
+            Log.e(TAG, "Error deleting repair with id: " + id, e);
+            return null;
+        });
+    }
+
+    public void save(Repair repair) {
+        CompletableFuture.runAsync(() -> {
+            RepairDTO repairDTO = new RepairDTO(repair.carId, repair.description, repair.price);
+            repairClient.add(repairDTO);
+            Log.i(TAG, "Repair: Saved repair with id: " + repair.id);
+        }).exceptionally((e) -> {
+            Log.e(TAG, "Error saving repair with id: " + repair.id, e);
+            return null;
+        });
+    }
+}
+----
+* Methoden zum Laden, Löschen und Speichern von Reparaturen
+* Ebenfalls CompletableFutures verwendet
+====
+
+=== MainActivity:
+
+.MainActivity
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop;
+
+import static at.htl.carshop.CarShopApplication.TAG;
+
+import android.os.Bundle;
+import android.util.Log;
+
+import androidx.activity.ComponentActivity;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
+import javax.inject.Inject;
+
+import at.htl.carshop.model.Car;
+import at.htl.carshop.model.CarService;
+import at.htl.carshop.model.ModelStore;
+import at.htl.carshop.model.Repair;
+import at.htl.carshop.model.RepairService;
+import at.htl.carshop.ui.layout.MainViewBuilder;
+import at.htl.carshop.util.Config;
+import dagger.hilt.android.AndroidEntryPoint;
+
+@AndroidEntryPoint
+public class MainActivity extends ComponentActivity {
+    @Inject
+    MainViewBuilder mainViewBuilder;
+    @Inject
+    CarService carService;
+    @Inject
+    RepairService repairService;
+
+    @Inject
+    ModelStore store;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Config.load(this);
+        var base_url = Config.getProperty("json.placeholder.baseurl");
+        Log.i(TAG, "onCreate: " + base_url);
+
+
+        CompletableFuture<Car[]> carFuture = carService.getAll()
+                .exceptionally((e) -> {
+                    Log.e(TAG, "Error loading cars", e);
+                    return null;
+                });
+
+        CompletableFuture<Repair[]> repairFuture = repairService.getAll()
+                .exceptionally((e) -> {
+                    Log.e(TAG, "Error loading repairs", e);
+                    return null;
+                });
+
+        CompletableFuture.allOf(carFuture, repairFuture).thenRun(() -> { //<1>
+            Car[] cars = carFuture.join();
+            Repair[] repairs = repairFuture.join();
+
+            if (cars != null && repairs != null) { // <1>
+                store.setCars(cars);
+                store.setRepairs(repairs);
+                runOnUiThread(() -> {
+                    mainViewBuilder.setContentOfActivity(this); // <3>
+                });
+            } else { // <2>
+                Log.e(TAG, "Error loading cars or repairs");
+            }
+        });
+    }
+}
+----
+* MainActivity, welcher die Autos und Reparaturen lädt und dann die MainView startet
+1. Wartet auf das Laden der Autos und Reparaturen, bevor die MainView gestartet wird
+2. Fehlerbehandlung, falls Autos oder Reparaturen nicht geladen werden konnten
+3. MainViewBuilder verwendet, welcher die verschiedenen Views startet und verwaltet.
+Der MainViewBuilder wechselt die jeweilige View, je nachdem, welche benötigt wird.
+====
+
+=== Views:
+
+.MainView
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.ui.layout
+
+import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.rxjava3.subscribeAsState
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import at.htl.carshop.model.Model
+import at.htl.carshop.model.ModelStore
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class MainViewBuilder {
+    @Inject
+    lateinit var store: ModelStore
+
+    @Inject
+    constructor() {
+    }
+    fun setContentOfActivity(activity: ComponentActivity) {
+        val view = ComposeView(activity)
+        view.setContent {
+            val viewModel = store.pipe.observeOn(AndroidSchedulers.mainThread()).subscribeAsState(initial = Model()).value
+            Surface(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                TabScreen(viewModel, store, activity) // <1>
+            }
+        }
+        activity.setContentView(view)
+    }
+}
+----
+* MainViewBuilder, welcher die MainView startet
+1. Verweist auf den TabScreen, welcher die Views wechselt
+====
+
+.TabScreen
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.ui.layout
+
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import at.htl.carshop.model.Model
+import at.htl.carshop.model.ModelStore
+import at.htl.carshop.ui.layout.Cars
+
+@Composable
+fun TabScreen(model: Model, store: ModelStore?, activity: ComponentActivity) {
+    var uiState = model.uiState
+    val tabIndex = uiState.selectedTab
+    val tabs = listOf("Cars", "Repairs")
+    Column(modifier = Modifier.fillMaxWidth()) {
+        TabRow(selectedTabIndex = uiState.selectedTab) {
+            tabs.forEachIndexed { index, title ->
+                Tab(text = { Text(title) },
+                    selected = tabIndex == index,
+                    onClick = { store?.selectTab(index) },
+                    icon = {
+                        when (index) {
+                            0 -> Icon(imageVector = Icons.Default.Home, contentDescription = null)
+                            1 -> BadgedBox(badge = { Badge { Text("${model.repairs.size}") } }) {
+                                Icon(Icons.Filled.Settings, contentDescription = "Repairs")
+                            }
+                        }
+                    }
+                )
+            }
+        }
+        when (tabIndex) {
+            0 -> store?.let { // <1>
+                Cars(
+                    model = model,
+                    modifier = Modifier.padding(top = 56.dp),
+                    store = it
+                )
+            }
+
+            1 -> store?.let { CarsRepair(model = model, store = it) }
+            2 -> {
+                store?.let { CreateCar(model = model, store = it) }
+            }
+
+            3 -> {
+                store?.let { CreateRepair(model = model, store = it) }
+            }
+        }
+    }
+}
+
+----
+* Wechselt die Views je nach ausgewähltem Tab
+
+1. Ab hier sieht man, dass die Views gewechselt werden, je nach ausgewähltem Tab
+Mit den Zahlen 0, 1, 2, 3 wird die jeweilige View gewählt
+====
+
+.CarView
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.ui.layout
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import at.htl.carshop.model.Car
+import at.htl.carshop.model.Model
+import at.htl.carshop.model.ModelStore
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class CarView @Inject constructor() {
+}
+
+@Composable
+fun Cars(model: Model, store: ModelStore, modifier: Modifier) {
+    val cars = model.cars
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Brand",
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(3f)
+        )
+        Text(
+            text = "Model",
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(3f)
+        )
+        Text(
+            text = "Year",
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1.5f)
+        )
+    }
+    LazyColumn() {
+        items(cars.size) { index ->
+            CarRow(car = cars[index], store)
+            HorizontalDivider()
+        }
+    }
+    FloatingActionButton(
+        onClick = { store.selectTab(2) },
+    ) {
+        Icon(Icons.Filled.Add, "Floating action button.")
+    }
+
+}
+
+@Composable
+fun CarRow(car: Car, store: ModelStore) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = car.brand,
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(3f)
+        )
+        Text(
+            text = car.model,
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(3f)
+        )
+        Text(
+            text = car.year.toString(),
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+        )
+        IconButton(onClick = { store.deleteCarById(car.id) }) { //<1>
+            Icon(Icons.Filled.Delete, "Delete car.")
+        }
+    }
+    Spacer(modifier = Modifier.width(8.dp))
+}
+----
+* Ähnlich, wie die Todo View im vorherigen Beispiel, welche die Autos in einer Liste anzeigt
+* Mit einem Floating Action Button, um ein neues Auto hinzuzufügen
+** Wechselt auf die CreateCarView
+
+1. Verweist auf den Modelstore, um Autos zu löschen. Wird über die API als auch im Model gelöscht
+====
+
+.CreateCarView
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.ui.layout
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import at.htl.carshop.model.Car
+import at.htl.carshop.model.Model
+import at.htl.carshop.model.ModelStore
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class CreateCarView @Inject constructor() {
+}
+
+@Composable
+fun CreateCar(model: Model, store: ModelStore) {
+    var brand by remember { mutableStateOf("") }
+    var model by remember { mutableStateOf("") }
+    var year by remember { mutableStateOf("") }
+    var color by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+
+    Row {
+        TextField(
+            value = brand,
+            onValueChange = { brand = it },
+            label = { Text("Brand") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        TextField(
+            value = model,
+            onValueChange = { model = it },
+            label = { Text("Model") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        TextField(
+            value = year,
+            onValueChange = { year = it },
+            label = { Text("Year") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        TextField(
+            value = color,
+            onValueChange = { color = it },
+            label = { Text("Color") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        TextField(
+            value = price,
+            onValueChange = { price = it},
+            label = { Text("Price") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        IconButton(onClick = {
+            val car = Car(1, brand, model, year.toInt(), color, price.toInt())
+            store.createCar(car) // <1>
+        }) {
+            Icon(Icons.Filled.Add, "Create Car")
+        }
+    }
+
+}
+----
+* View zum Erstellen eines neuen Autos
+* Beinhaltet einige Textfelder für die Eingabe der Daten
+1. Verweist ebenfalls auf den Modelstore, um das Auto zu erstellen.
+Über die API als auch im Model hinzugefügt
+====
+
+.RepairView
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.ui.layout
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import at.htl.carshop.model.Car
+import at.htl.carshop.model.Model
+import at.htl.carshop.model.ModelStore
+import at.htl.carshop.model.Repair
+import java.lang.reflect.Modifier
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class RepairView @Inject constructor() {
+}
+
+@Composable
+fun CarsRepair(model: Model, store: ModelStore) {
+    val cars = model.cars
+    val expandedMap = remember { mutableStateMapOf<Car, Boolean>() }
+
+    LazyColumn() {
+        items(cars.size) { index ->
+            val car = cars[index]
+            val isExpanded = expandedMap[car] ?: false
+            CarRowRepair(car = car, isExpanded = isExpanded, onExpandClicked = {
+                expandedMap[car] = !isExpanded
+            })
+            HorizontalDivider()
+            if (isExpanded) {
+                val repairs = model.repairs.filter { it.carId == car.id }
+                repairs.forEach { repair ->
+                    RepairRow(repair = repair, store = store)
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+    FloatingActionButton(
+        onClick = { store.selectTab(3) },
+    ) {
+        Icon(Icons.Filled.Add, "Floating action button.")
+    }
+}
+
+@Composable
+fun CarRowRepair(car: Car, isExpanded: Boolean, onExpandClicked: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = androidx.compose.ui.Modifier.padding(8.dp),
+    ) {
+        Text(
+            text = car.brand,
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = androidx.compose.ui.Modifier.weight(3f)
+        )
+        Text(
+            text = car.model,
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = androidx.compose.ui.Modifier.weight(3f)
+        )
+        Text(
+            text = car.year.toString(),
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+
+        IconButton(onClick = onExpandClicked) {
+            Icon(
+                imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = "Expand/Collapse"
+            )
+        }
+    }
+}
+
+@Composable
+fun RepairRow(repair: Repair, store: ModelStore) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = androidx.compose.ui.Modifier.padding(5.dp)
+    ) {
+        Text(
+            text = repair.description,
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = androidx.compose.ui.Modifier.weight(3f)
+        )
+        Text(
+            text = repair.price.toString() + "€",
+            style = MaterialTheme.typography.bodySmall,
+            overflow = TextOverflow.Ellipsis,
+            modifier = androidx.compose.ui.Modifier.weight(3f)
+        )
+        IconButton(onClick = { store.deleteRepairById(repair.id) }){
+            Icon(
+                imageVector = Icons.Filled.Delete,
+                contentDescription = "Delete"
+            )
+        }
+    }
+}
+----
+* Zeigt die Autos an, welche vorhanden sind
+* Mittels einer Dropdown am jeweiligen Auto, werden die zugehörigen Reperaturen angezeigt
+* Floating Action Button, um eine neue Reparatur hinzuzufügen
+** Wechselt auf die CreateRepairView
+====
+
+.CreateRepairView
+[%collapsible]
+====
+[source,java]
+----
+package at.htl.carshop.ui.layout
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import at.htl.carshop.model.Car
+import at.htl.carshop.model.Model
+import at.htl.carshop.model.ModelStore
+import at.htl.carshop.model.Repair
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class CreateRepairView @Inject constructor() {
+}
+
+@Composable
+fun CreateRepair(model: Model, store: ModelStore) {
+    var price by remember { mutableStateOf("") }
+    var car by remember { mutableStateOf(Car()) }
+    var description by remember { mutableStateOf("") }
+    var showDropdown by remember { mutableStateOf(false) }
+
+    Row {
+        Button(onClick = { showDropdown = true }) {
+            Text("Select Car")
+        }
+        DropdownMenu( // <1>
+            expanded = showDropdown,
+            onDismissRequest = { showDropdown = false }
+        ) {
+            if (model.cars.isNotEmpty()) {
+                model.cars.forEach { dropdownCar ->
+                    DropdownMenuItem(onClick = {
+                        car = dropdownCar
+                        showDropdown = false
+                    }, text = {
+                        Text(text = dropdownCar.brand + " " + dropdownCar.model)
+                    })
+                }
+            }
+        }
+    }
+    Row {
+        Text(text = "Selected Car: " + car.brand + " " + car.model)
+    }
+    Row { // <2>
+        TextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Description") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        TextField(
+            value = price,
+            onValueChange = { price = it },
+            label = { Text("Price") }
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+    }
+    Row {
+        IconButton(onClick = {
+            val repair = Repair(car.id, 1, description, price.toInt())
+            store.createRepair(repair) // <3>
+        }) {
+            Icon(Icons.Filled.Add, "Create Car")
+        }
+    }
+}
+----
+* View zum Erstellen einer neuen Reparatur
+1. Beinhaltet eine Dropdown, um das Auto auszuwählen, welches repariert werden soll
+2. Weiters sind Textfelder für die Eingabe der Beschreibung und des Preises vorhanden
+3. Verweist auf den Modelstore, um die Reparatur zu erstellen
+Über die API als auch im Model hinzugefügt
+====
+
+=== Demo:
+
+.CarView
+image::images/cars.png[]
+
+.CreateCarView
+image::images/createCarView.png[]
+
+.RepairView
+image::images/repairView.png[]
+
+.CreateRepairView
+image::images/createRepairView.png[]
+
+
+
