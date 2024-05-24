@@ -51,9 +51,14 @@ fun TabScreen(model: Model, store: ModelStore?, activity: ComponentActivity) {
                     store = it
                 )
             }
-            //1 -> store?.let { TodosDetail(model = model, store = it) }
+
+            1 -> store?.let { CarsRepair(model = model, store = it) }
             2 -> {
                 store?.let { CreateCar(model = model, store = it) }
+            }
+
+            3 -> {
+                store?.let { CreateRepair(model = model, store = it) }
             }
         }
     }

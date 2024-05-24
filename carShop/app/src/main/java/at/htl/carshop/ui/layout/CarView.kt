@@ -1,16 +1,20 @@
 package at.htl.carshop.ui.layout
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,11 +59,12 @@ fun Cars(model: Model, store: ModelStore, modifier: Modifier) {
             text = "Year",
             style = MaterialTheme.typography.bodySmall,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1.5f)
         )
     }
     LazyColumn() {
         items(cars.size) { index ->
-            CarRow(car = cars[index])
+            CarRow(car = cars[index], store)
             HorizontalDivider()
         }
     }
@@ -72,7 +77,7 @@ fun Cars(model: Model, store: ModelStore, modifier: Modifier) {
 }
 
 @Composable
-fun CarRow(car: Car) {
+fun CarRow(car: Car, store: ModelStore) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -96,6 +101,9 @@ fun CarRow(car: Car) {
             style = MaterialTheme.typography.bodySmall,
             overflow = TextOverflow.Ellipsis,
         )
+        IconButton(onClick = { store.deleteCarById(car.id) }) {
+            Icon(Icons.Filled.Delete, "Delete car.")
+        }
     }
     Spacer(modifier = Modifier.width(8.dp))
 }
