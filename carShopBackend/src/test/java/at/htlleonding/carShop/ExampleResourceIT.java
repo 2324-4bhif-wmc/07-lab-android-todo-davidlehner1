@@ -1,4 +1,4 @@
-package at.htlleonding.tickets;
+package at.htlleonding.carShop;
 
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 

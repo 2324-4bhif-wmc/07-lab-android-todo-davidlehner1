@@ -51,7 +51,7 @@ fun CarsRepair(model: Model, store: ModelStore) {
             })
             HorizontalDivider()
             if (isExpanded) {
-                val repairs = model.repairs.filter { it.car.id == car.id }
+                val repairs = model.repairs.filter { it.carId == car.id }
                 repairs.forEach { repair ->
                     RepairRow(repair = repair, store = store)
                     HorizontalDivider()

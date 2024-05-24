@@ -79,7 +79,7 @@ fun CreateRepair(model: Model, store: ModelStore) {
     }
     Row {
         IconButton(onClick = {
-            val repair = Repair(car, 1, description, price.toInt())
+            val repair = Repair(car.id, 1, description, price.toInt())
             store.createRepair(repair)
         }) {
             Icon(Icons.Filled.Add, "Create Car")

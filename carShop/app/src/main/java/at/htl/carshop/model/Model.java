@@ -12,12 +12,12 @@ public class Model {
     };
 
     public Repair[] repairs = {
-            new Repair(cars[0], 1L, "Change oil", 100),
-            new Repair(cars[0], 2L, "Change tires", 200),
-            new Repair(cars[1], 3L, "Change oil", 100),
-            new Repair(cars[1], 4L, "Change tires", 200),
-            new Repair(cars[2], 5L, "Change oil", 100),
-            new Repair(cars[2], 6L, "Change tires", 200),
+            new Repair(cars[0].id, 1L, "Change oil", 100),
+            new Repair(cars[0].id, 2L, "Change tires", 200),
+            new Repair(cars[1].id, 3L, "Change oil", 100),
+            new Repair(cars[1].id, 4L, "Change tires", 200),
+            new Repair(cars[2].id, 5L, "Change oil", 100),
+            new Repair(cars[2].id, 6L, "Change tires", 200),
     };
     public UIState uiState = new UIState();
 

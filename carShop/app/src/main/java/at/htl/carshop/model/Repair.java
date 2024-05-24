@@ -1,7 +1,7 @@
 package at.htl.carshop.model;
 
 public class Repair {
-    public Car car;
+    public Long carId;
     public Long id;
     public String description;
     public int price;
@@ -9,8 +9,8 @@ public class Repair {
     public Repair() {
     }
 
-    public Repair(Car car, Long id, String description, int price) {
-        this.car = car;
+    public Repair(Long carId, Long id, String description, int price) {
+        this.carId = carId;
         this.id = id;
         this.description = description;
         this.price = price;
